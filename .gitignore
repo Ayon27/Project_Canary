@@ -1,0 +1,8 @@
+__pycache__/
+
+ECPTransformer-master/
+output/
+checkpoints/
+
+.slurm
+*_report.md
