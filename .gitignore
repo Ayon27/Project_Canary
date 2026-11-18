@@ -4,5 +4,6 @@ ECPTransformer-master/
 output/
 checkpoints/
 
-.slurm
+*.slurm
 *_report.md
+
