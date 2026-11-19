@@ -3,6 +3,8 @@ __pycache__/
 ECPTransformer-master/
 output/
 checkpoints/
+docs/
+tests/
 
 *.slurm
 *_report.md

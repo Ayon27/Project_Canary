@@ -14,7 +14,7 @@ def save_and_plot_metrics(log_history, base_output_dir="./output", model_name="q
     svg_file = os.path.join(target_dir, "training_metrics.svg")
 
     train_steps, train_losses = [], []
-    eval_steps, eval_losses, eval_ppls = [], []
+    eval_steps, eval_losses, eval_ppls = [], [], []
 
     for entry in log_history:
         step = entry.get("step")
