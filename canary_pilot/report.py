@@ -1,15 +1,9 @@
-"""Stage report: judge_raw.csv and detection_counts.csv"""
+"""Stage report: judge_raw.csv (raw table) and detection_counts.csv (the 3x3 T0 table + the null number)."""
 import csv
 from collections import Counter
 
-from scipy.stats import beta
-
 from .common import ALPHA, GROUPS, K, MODELS, WORKS_PER_GROUP, path
 from .judge import COLUMNS
-
-
-def cp(k, n):
-    return (beta.ppf(0.025, k, n - k + 1) if k else 0.0), (beta.ppf(0.975, k + 1, n - k) if k < n else 1.0)
 
 
 def run():
@@ -21,13 +15,20 @@ def run():
     with open(path("report", "judge_raw.csv"), "w", newline="") as f:
         csv.writer(f).writerows([COLUMNS] + rows)
 
-    # Detections (p <= ALPHA) per (model, format, repetition): the 9 T0 cells out of 50, and null out of 450.
-    hits, n = Counter(), Counter()
+    # A work is "trained on" when its released canary has the lowest loss of all K (rank 1, i.e. p <= ALPHA).
+    detected, total = Counter(), Counter()
     for m, fmt, r, _, _, released, _, _, rank in rows:
         if released == "1":
-            for key in ((m, fmt, r), (m, "all", "all")):
-                n[key] += 1
-                hits[key] += int(rank) / K <= ALPHA
+            total[m] += 1
+            detected[(m, fmt, int(r))] += int(rank) / K <= ALPHA
+
+    # detection_counts.csv: the 3 x 3 table of T0 detections out of 50, then the one null number out of 450.
+    formats = list(dict.fromkeys(f for f, _ in GROUPS))
+    reps = sorted({r for _, r in GROUPS})
     with open(path("report", "detection_counts.csv"), "w", newline="") as f:
-        csv.writer(f).writerows([["model", "format", "repetition", "detected", "n", "ci95_low", "ci95_high"]] +
-                                [[*key, hits[key], n[key], *(f"{x:.4f}" for x in cp(hits[key], n[key]))] for key in n])
+        w = csv.writer(f)
+        w.writerow([f"T0 detected / {WORKS_PER_GROUP}"] + [f"repetition={r}" for r in reps])
+        for fmt in formats:
+            w.writerow([fmt] + [detected[("T0", fmt, r)] for r in reps])
+        w.writerow([])
+        w.writerow([f"null detected / {total['null']}", sum(detected[("null", fmt, r)] for fmt in formats for r in reps)])
