@@ -1,11 +1,11 @@
 __pycache__/
 
-ECPTransformer-master/
 output/
-checkpoints/
 docs/
 tests/
+slurm/
 
 *.slurm
+*.sh
 *_report.md
 
