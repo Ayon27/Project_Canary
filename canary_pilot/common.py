@@ -11,7 +11,8 @@ os.environ.setdefault("HF_DATASETS_CACHE", DATA_DIR)
 
 from canaries import DEFAULT_CFG 
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "canary_pilot")
+_DEFAULT_OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output", "canary_pilot")
+OUT = os.environ.get("CANARY_OUT", _DEFAULT_OUT)
 TOKENIZER_ID, BLOCK, EOS = "Qwen/Qwen2.5-0.5B", 2048, "<|endoftext|>"
 K, ALPHA, MODELS = DEFAULT_CFG["K"], 0.01, ("T0", "null")
 GROUPS = [(f, r) for f in ("rand_alnum", "rand_words", "carrier") for r in (1, 5, 10)]  # group g: canary seed g

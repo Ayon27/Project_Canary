@@ -28,15 +28,26 @@ def run(model_name):
     tok, out = tokenizer(), path("models", model_name, "")
     set_seed(TRAIN_SEED)
     model = Qwen2ForCausalLM(Qwen2Config(
-        vocab_size=len(tok), hidden_size=768, intermediate_size=2048, num_hidden_layers=12, num_attention_heads=12,
-        num_key_value_heads=4, max_position_embeddings=BLOCK, rope_theta=1e6, rms_norm_eps=1e-6,
+        vocab_size=len(tok), hidden_size=896, intermediate_size=4864, num_hidden_layers=24, num_attention_heads=14,
+        num_key_value_heads=2, max_position_embeddings=BLOCK, rope_theta=1e6, rms_norm_eps=1e-6,
         tie_word_embeddings=True, sliding_window=None, use_sliding_window=False))
+    epochs = int(os.environ.get("CANARY_EPOCHS", "10"))
+    batch_size = int(os.environ.get("CANARY_BATCH_SIZE", "4"))
+    grad_accum = int(os.environ.get("CANARY_GRAD_ACCUM", "8"))
+    use_cuda = torch.cuda.is_available()
+    use_bf16 = use_cuda and torch.cuda.is_bf16_supported()
+    use_tf32 = use_cuda and torch.cuda.get_device_capability()[0] >= 8
     args = TrainingArguments(
-        output_dir=out, num_train_epochs=1, per_device_train_batch_size=4, per_device_eval_batch_size=4,
-        gradient_accumulation_steps=8, learning_rate=4e-4, lr_scheduler_type="cosine", warmup_ratio=0.03,
-        weight_decay=0.01, adam_beta1=0.9, adam_beta2=0.95, optim="adamw_torch_fused", bf16=True, tf32=True,
-        eval_strategy="steps", eval_steps=300, save_strategy="no", logging_steps=25, dataloader_num_workers=4,
-        seed=TRAIN_SEED, data_seed=TRAIN_SEED, report_to="none")
+        output_dir=out, num_train_epochs=epochs, per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size, gradient_accumulation_steps=grad_accum,
+        learning_rate=4e-4, lr_scheduler_type="cosine", warmup_ratio=0.03,
+        weight_decay=0.01, adam_beta1=0.9, adam_beta2=0.95,
+        optim="adamw_torch_fused" if use_cuda else "adamw_torch",
+        bf16=use_bf16, tf32=use_tf32,
+        eval_strategy="steps", eval_steps=300, save_strategy="steps" if epochs > 1 else "no",
+        save_steps=300, save_total_limit=2, load_best_model_at_end=(epochs > 1),
+        metric_for_best_model="eval_loss", greater_is_better=False,
+        logging_steps=25, dataloader_num_workers=4, seed=TRAIN_SEED, data_seed=TRAIN_SEED, report_to="none")
     val = prepare_lm_datasets({"validation": load_wikitext()["validation"]}, tok, BLOCK, num_proc=1)["validation"]
     trainer = Trainer(model=model, args=args, train_dataset=Blocks(path("corpora", f"{model_name}_stream.npy")),
                       eval_dataset=val, data_collator=default_data_collator)
