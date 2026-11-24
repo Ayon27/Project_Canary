@@ -1,6 +1,7 @@
 """Qwen2 trained from scratch on a canary token stream (HF Trainer)."""
 import csv
 import math
+import os
 
 import numpy as np
 import torch
@@ -19,6 +20,33 @@ class Blocks(torch.utils.data.Dataset):
     def __getitem__(self, i):
         x = torch.from_numpy(self.a[i * self.block:(i + 1) * self.block].astype(np.int64))
         return {"input_ids": x, "labels": x}
+
+
+def csv_logger(d):
+    """Trainer callback: appends train loss to d/train_log.csv and validation loss and perplexity to d/eval_log.csv
+    as they are logged."""
+    from transformers import TrainerCallback
+
+    def append(name, row):
+        with open(os.path.join(d, name), "a", newline="") as f:
+            csv.writer(f).writerow(row)
+
+    class CSVLogger(TrainerCallback):
+        def on_train_begin(self, args, state, control, **kw):
+            if state.is_world_process_zero:
+                for name, cols in (("train_log.csv", ["step", "train_loss"]),
+                                   ("eval_log.csv", ["step", "validation_loss", "validation_ppl"])):
+                    with open(os.path.join(d, name), "w", newline="") as f:
+                        csv.writer(f).writerow(cols)
+
+        def on_log(self, args, state, control, logs=None, **kw):
+            if state.is_world_process_zero and logs:
+                if "loss" in logs:
+                    append("train_log.csv", [state.global_step, logs["loss"]])
+                if "eval_loss" in logs:
+                    append("eval_log.csv", [state.global_step, logs["eval_loss"], math.exp(logs["eval_loss"])])
+
+    return CSVLogger()
 
 
 def train(c, m):
@@ -42,15 +70,9 @@ def train(c, m):
         report_to="none")
     val = prepare_lm_datasets({"validation": load()["validation"]}, tok, B, num_proc=1)["validation"]
     trainer = Trainer(model=model, args=args, train_dataset=Blocks(out(c, "corpora", f"{m}_stream.npy"), B),
-                      eval_dataset=val, data_collator=default_data_collator)
+                      eval_dataset=val, data_collator=default_data_collator, callbacks=[csv_logger(d)])
     trainer.train()
-    trainer.evaluate()
-    hist = trainer.state.log_history
-    with open(d + "train_log.csv", "w", newline="") as f:
-        csv.writer(f).writerows([["step", "train_loss"]] + [[h["step"], h["loss"]] for h in hist if "loss" in h])
-    with open(d + "eval_log.csv", "w", newline="") as f:
-        csv.writer(f).writerows([["step", "validation_loss", "validation_ppl"]] +
-                                [[h["step"], h["eval_loss"], math.exp(h["eval_loss"])] for h in hist if "eval_loss" in h])
+    trainer.evaluate()  # final validation row, after the best model is loaded
     trainer.save_model(d)  # model.safetensors marks the stage as done
 
 

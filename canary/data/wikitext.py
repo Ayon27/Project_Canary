@@ -56,6 +56,8 @@ def prepare_ecp_eval(c):
         if os.path.exists(bin_path) and os.path.exists(man_path):
             continue
         arr = np.array([i for ids in encode(c, [t for t in load()[split]["text"] if t.strip()]) for i in ids], np.uint16)
-        arr.tofile(bin_path)
+        tmp = f"{bin_path}.{os.getpid()}.tmp"  # T0 and null may prepare at the same time
+        arr.tofile(tmp)
+        os.replace(tmp, bin_path)
         write_json(man_path, dict(split=split, num_tokens=int(arr.size), dtype="uint16",
                                   sha256=hashlib.sha256(arr.tobytes()).hexdigest()))

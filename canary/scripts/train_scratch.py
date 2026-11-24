@@ -1,4 +1,7 @@
-"""Qwen2.5 (768-dim, 12 layers) from scratch on WikiText-103: torchrun -m canary.scripts.train_scratch"""
+"""Qwen2.5 (768-dim, 12 layers) from scratch on WikiText-103: torchrun -m canary.scripts.train_scratch
+
+Logs train_log.csv and eval_log.csv (validation perplexity) during training; metrics.csv and plots at the end.
+"""
 import argparse
 import csv
 import math
@@ -8,6 +11,7 @@ import torch
 
 from ..config import DATA_DIR
 from ..data.wikitext import load, prepare_lm_datasets
+from ..models.qwen import csv_logger
 
 
 def save_and_plot_metrics(log_history, target_dir, model_name):
@@ -80,8 +84,8 @@ def main():
         warmup_ratio=a.warmup_ratio, lr_scheduler_type="cosine",
         bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(), logging_steps=25,
         dataloader_num_workers=4, ddp_find_unused_parameters=False, report_to="none")
-    callbacks = [EarlyStoppingCallback(early_stopping_patience=a.patience,
-                                       early_stopping_threshold=a.early_stopping_threshold)] if a.use_early_stopping else []
+    callbacks = [csv_logger(model_dir)] + ([EarlyStoppingCallback(
+        early_stopping_patience=a.patience, early_stopping_threshold=a.early_stopping_threshold)] if a.use_early_stopping else [])
     trainer = Trainer(model=model, args=args, train_dataset=data["train"], eval_dataset=data["validation"],
                       data_collator=default_data_collator, callbacks=callbacks)
     trainer.train()
