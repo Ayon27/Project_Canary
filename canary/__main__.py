@@ -17,7 +17,7 @@ import time
 
 import numpy as np
 
-from .config import EXPERIMENTS, MODELS, ROOT
+from .config import EXPERIMENTS, MODELS, OUTPUT_ROOT, ROOT
 from .data import wikitext
 from .models import ecp, qwen
 from .pipeline import corpora, judge, report, works
@@ -67,7 +67,7 @@ def parse_args():
             g.add_argument(f"--{k}", type=typ, default=v, help=f"default: {v}")
     a = ap.parse_args()
     c = {k: getattr(a, k, v) for k, v in EXPERIMENTS[exp].items()}
-    return a, dict(c, out=os.path.join(ROOT, "output", a.name))
+    return a, dict(c, out=os.path.join(OUTPUT_ROOT, a.name))
 
 
 def record(c, a, stage_names):

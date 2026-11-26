@@ -9,7 +9,7 @@ import os
 
 import torch
 
-from ..config import DATA_DIR
+from ..config import DATA_DIR, OUTPUT_ROOT
 from ..data.wikitext import load, prepare_lm_datasets
 from ..models.qwen import csv_logger
 
@@ -52,7 +52,7 @@ def save_and_plot_metrics(log_history, target_dir, model_name):
 
 def main():
     p = argparse.ArgumentParser(description="Pretrain Qwen2.5 from scratch on WikiText-103")
-    for name, default in dict(data_dir=DATA_DIR, output_dir="./output", model_name="qwen2.5_scratch",
+    for name, default in dict(data_dir=DATA_DIR, output_dir=OUTPUT_ROOT, model_name="qwen2.5_scratch",
                               tokenizer_id="Qwen/Qwen2.5-0.5B", block_size=2048, batch_size=4, grad_accum=8, epochs=10,
                               lr=4e-4, warmup_ratio=0.03, weight_decay=0.01, adam_beta1=0.9, adam_beta2=0.95,
                               eval_steps=300, save_steps=300, num_proc=4, patience=6,

@@ -2,7 +2,26 @@
 import os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = "/work/pi_kaleel_mahmood_uri_edu/syed_uri/LLM_DATASETS"
+
+
+def _load_env(path):
+    env = {}
+    if not os.path.isfile(path):
+        return env
+    with open(path, encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip().strip('"').strip("'")
+    return env
+
+
+_ENV = _load_env(os.path.join(ROOT, ".env"))
+DATA_DIR = _ENV.get("DATA_DIR", os.path.join(ROOT, "data"))
+OUTPUT_ROOT = _ENV.get("OUTPUT_DIR", os.path.join(ROOT, "output"))
+LOGS_DIR = _ENV.get("LOGS_DIR", os.path.join(ROOT, "logs"))
 os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("HF_DATASETS_CACHE", DATA_DIR)

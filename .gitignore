@@ -1,4 +1,7 @@
 __pycache__/
+.venv
+.venv/
+.env
 
 output/
 docs/
@@ -10,3 +13,5 @@ logs/
 *.sh
 *_report.md
 
+#temp folder - will fix later
+mink-plus-plus-main
