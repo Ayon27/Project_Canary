@@ -25,7 +25,7 @@ from sklearn.metrics import auc, roc_curve
 from tqdm import tqdm
 
 from ..models import ecp, qwen
-from ..utils import encode, out, read_jsonl
+from ..utils import encode, out, read_jsonl, tokenizer
 from .canaries import split_sentences
 
 SCORE_META_COLS = ["model", "split", "label", "work_id", "article_index", "format", "repetition", "n_tokens"]
@@ -149,7 +149,7 @@ def run(c, m):
     works = read_jsonl(out(c, "works", "works_manifest.jsonl"))
     heldout = read_jsonl(out(c, "works", "heldout_works.jsonl"))
     E = c["eos"] + "\n"
-    prefix_ids = encode(c, E)
+    tok, prefix_ids = tokenizer(c["tokenizer"]), encode(c, E)
 
     items = ([(True, w) for w in works] + [(False, h) for h in heldout])
     records = []
@@ -161,10 +161,13 @@ def run(c, m):
         else:
             ids = prefix_ids + encode(c, text + "\n")
             start = len(prefix_ids)
-        if max_tok > 0:
+        if max_tok > 0 and len(ids) > start + max_tok:
             ids = ids[:start + max_tok]
+            zlib_text = tok.decode(ids[start:])
+        else:
+            zlib_text = text
         assert len(ids) <= c["block"], f"article {row['article_index']} has {len(ids)} tokens > block {c['block']}"
-        n_tok, sc = score_document(ids, start, text, ratios, **scorer_kw)
+        n_tok, sc = score_document(ids, start, zlib_text, ratios, **scorer_kw)
         records.append(dict(
             split="member" if is_member else "heldout",
             label=int(is_member),
