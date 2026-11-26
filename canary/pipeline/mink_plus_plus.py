@@ -1,4 +1,4 @@
-r"""Stage mink_plus_plus: Test 1 passive MIA (Min-K%++, Min-K%, Loss, Zlib), fp32.
+r"""mink_plus_plus: passive MIA (Min-K%++, Min-K%, Loss, Zlib), fp32.
 
 Scoring and ROC evaluation are adapted from the official Min-K%++ repository
 (MIT License, Copyright (c) 2024 Jingyang Zhang):

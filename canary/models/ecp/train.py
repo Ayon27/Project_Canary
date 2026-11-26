@@ -19,7 +19,7 @@ RESUME_KEYS = ("layers", "dim", "heads", "sequence_length", "num_segments", "net
                "lr_halving_every", "global_batch", "original_grad_accum", "seed", "precision", "train_sha256")
 TRAIN_COLS = ["iteration", "lr_decay_group", "lr_no_decay_group", "train_loss", "grad_norm", "tokens_per_sec",
               "elapsed_sec"]
-EVAL_COLS = ["iteration", "test_ppl", "validation_ppl", "best_test_ppl", "eval_sec"]
+EVAL_COLS = ["iteration", "test_ppl", "validation_ppl", "best_validation_ppl", "eval_sec"]
 
 
 def configure_optimizers(model, lr):
@@ -85,7 +85,7 @@ def truncate_csv(path, cols, start_it):
         with open(path, newline="") as f:
             rows = [r for r in csv.DictReader(f) if int(r["iteration"]) < start_it]
         with open(path, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=cols)
+            w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
             w.writeheader()
             w.writerows(rows)
 
@@ -141,7 +141,7 @@ def train(c, tokens, eval_dir, out_dir, sha=None, prepare=None):
         assert not diff, f"{last_path} was written with a different configuration: {diff}"
         model.load_state_dict(ck["model"])
         optim.load_state_dict(ck["optimizer"])
-        start, best = int(ck["iteration"]), float(ck.get("best_test_ppl", best))
+        start, best = int(ck["iteration"]), float(ck.get("best_validation_ppl", ck.get("best_test_ppl", best)))
         running_lr = float(ck.get("running_lr", running_lr))
         log(f"resumed from {last_path} at iteration {start}")
         del ck
@@ -203,17 +203,17 @@ def train(c, tokens, eval_dir, out_dir, sha=None, prepare=None):
             t0 = time.time()
             res = {s: eval_ppl(model, d, seq, device, c["eval_batch"], rank, world, amp)
                    for s, d in (("test", test), ("validation", val))}
-            improved = res["test"] < best
+            improved = res["validation"] < best
             if improved:
-                best = res["test"]
+                best = res["validation"]
                 if is_main:
                     atomic_save({"model": model.state_dict(), "iteration": it, "test_ppl": res["test"],
                                  "validation_ppl": res["validation"], **({"config": cfg} if exact else {})}, best_path)
             if is_main:
                 append_csv(os.path.join(out_dir, "eval_log.csv"), EVAL_COLS, dict(
-                    iteration=it, test_ppl=res["test"], validation_ppl=res["validation"], best_test_ppl=best,
+                    iteration=it, test_ppl=res["test"], validation_ppl=res["validation"], best_validation_ppl=best,
                     eval_sec=round(time.time() - t0, 1)))
-            log(f"eval it {it}: test ppl {res['test']:.4f} val ppl {res['validation']:.4f} best {best:.4f}")
+            log(f"eval it {it}: test ppl {res['test']:.4f} val ppl {res['validation']:.4f} best val {best:.4f}")
             barrier()
 
         if (it + 1) % c["save_every"] == 0 or last_it:
@@ -224,7 +224,7 @@ def train(c, tokens, eval_dir, out_dir, sha=None, prepare=None):
                 barrier()
             if is_main:
                 atomic_save({"model": model.state_dict(), "optimizer": optim.state_dict(), "iteration": it + 1,
-                             "best_test_ppl": best, "running_lr": running_lr, **({"config": cfg} if exact else {})},
+                             "best_validation_ppl": best, "running_lr": running_lr, **({"config": cfg} if exact else {})},
                             last_path)
             barrier()
     if world > 1:

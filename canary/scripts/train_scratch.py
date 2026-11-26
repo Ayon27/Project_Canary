@@ -67,7 +67,14 @@ def main():
     os.environ["HF_DATASETS_CACHE"] = a.data_dir
     model_dir = os.path.join(a.output_dir, a.model_name)
     os.makedirs(os.path.join(model_dir, "checkpoints"), exist_ok=True)
-    tokenizer = AutoTokenizer.from_pretrained(a.tokenizer_id, cache_dir=a.data_dir)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(a.tokenizer_id, cache_dir=a.data_dir)
+    except OSError:
+        import glob
+        snaps = sorted(glob.glob(os.path.join(a.data_dir, "models--" + a.tokenizer_id.replace("/", "--"), "snapshots", "*")))
+        if not snaps:
+            raise
+        tokenizer = AutoTokenizer.from_pretrained(snaps[-1], local_files_only=True)
     tokenizer.pad_token = tokenizer.pad_token or tokenizer.eos_token
     model = Qwen2ForCausalLM(Qwen2Config(
         vocab_size=len(tokenizer), hidden_size=768, intermediate_size=2048, num_hidden_layers=12, num_attention_heads=12,
@@ -76,12 +83,13 @@ def main():
     raw = load(a.data_dir)
     data = prepare_lm_datasets(raw, tokenizer, a.block_size, a.num_proc)
     args = TrainingArguments(
-        output_dir=os.path.join(model_dir, "checkpoints"), overwrite_output_dir=True, eval_strategy="steps",
-        eval_steps=a.eval_steps, save_steps=a.save_steps, save_total_limit=2, load_best_model_at_end=True,
+        output_dir=os.path.join(model_dir, "checkpoints"), eval_strategy="steps",
+        eval_steps=a.eval_steps, save_steps=a.save_steps, save_total_limit=2,
+        load_best_model_at_end=a.use_early_stopping,
         metric_for_best_model="eval_loss", greater_is_better=False, learning_rate=a.lr, weight_decay=a.weight_decay,
         adam_beta1=a.adam_beta1, adam_beta2=a.adam_beta2, per_device_train_batch_size=a.batch_size,
         per_device_eval_batch_size=a.batch_size, gradient_accumulation_steps=a.grad_accum, num_train_epochs=a.epochs,
-        warmup_ratio=a.warmup_ratio, lr_scheduler_type="cosine",
+        warmup_steps=a.warmup_ratio, lr_scheduler_type="cosine",
         bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(), logging_steps=25,
         dataloader_num_workers=4, ddp_find_unused_parameters=False, report_to="none")
     callbacks = [csv_logger(model_dir)] + ([EarlyStoppingCallback(
@@ -89,6 +97,10 @@ def main():
     trainer = Trainer(model=model, args=args, train_dataset=data["train"], eval_dataset=data["validation"],
                       data_collator=default_data_collator, callbacks=callbacks)
     trainer.train()
+    if not a.use_early_stopping:
+        trainer.save_model(os.path.join(model_dir, "last"))
+        if trainer.state.best_model_checkpoint is not None:
+            trainer._load_best_model()
     trainer.save_model(model_dir)
     tokenizer.save_pretrained(model_dir)
 

@@ -61,19 +61,22 @@ def train(c, m):
     args = TrainingArguments(
         output_dir=d, num_train_epochs=epochs, per_device_train_batch_size=c["batch_size"],
         per_device_eval_batch_size=c["batch_size"], gradient_accumulation_steps=c["grad_accum"],
-        learning_rate=4e-4, lr_scheduler_type="cosine", warmup_ratio=0.03, weight_decay=0.01, adam_beta1=0.9,
+        learning_rate=4e-4, lr_scheduler_type="cosine", warmup_steps=0.03, weight_decay=0.01, adam_beta1=0.9,
         adam_beta2=0.95, optim="adamw_torch_fused" if cuda else "adamw_torch",
         bf16=cuda and torch.cuda.is_bf16_supported(), tf32=cuda and torch.cuda.get_device_capability()[0] >= 8,
-        eval_strategy="steps", eval_steps=300, save_strategy="steps" if epochs > 1 else "no", save_steps=300,
-        save_total_limit=2, load_best_model_at_end=epochs > 1, metric_for_best_model="eval_loss",
+        eval_strategy="steps", eval_steps=300, save_strategy="steps", save_steps=300,
+        save_total_limit=2, load_best_model_at_end=False, metric_for_best_model="eval_loss",
         greater_is_better=False, logging_steps=25, dataloader_num_workers=4, seed=seed, data_seed=seed,
         report_to="none")
     val = prepare_lm_datasets({"validation": load()["validation"]}, tok, B, num_proc=1)["validation"]
     trainer = Trainer(model=model, args=args, train_dataset=Blocks(out(c, "corpora", f"{m}_stream.npy"), B),
                       eval_dataset=val, data_collator=default_data_collator, callbacks=[csv_logger(d)])
     trainer.train()
+    trainer.save_model(os.path.join(d, "last"))  # final weights at end of training
+    if trainer.state.best_model_checkpoint is not None:
+        trainer._load_best_model()
     trainer.evaluate()  # final validation row, after the best model is loaded
-    trainer.save_model(d)  # model.safetensors marks the stage as done
+    trainer.save_model(d)  # best weights; model.safetensors marks the stage as done
 
 
 def scorer(c, m, checkpoint=None):

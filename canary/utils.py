@@ -83,6 +83,6 @@ def plot_run(c):
         label = f"{name} {os.path.relpath(d, c['out'])}".removesuffix(" .")
         with open(ev) as f:
             cols = f.readline().strip().split(",")
-        ppl = [k for k in cols if k.endswith("_ppl") and k != "best_test_ppl"]
+        ppl = [k for k in cols if k.endswith("_ppl") and not k.startswith("best_")]
         plot_metrics(f"{d}/train_log.csv", cols[0], ["train_loss"], f"{d}/train_loss.png", f"{label}: training loss")
         plot_metrics(ev, cols[0], ppl, f"{d}/perplexity.png", f"{label}: perplexity", log_y=True)
