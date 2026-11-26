@@ -20,7 +20,7 @@ import numpy as np
 from .config import EXPERIMENTS, MODELS, OUTPUT_ROOT, ROOT
 from .data import wikitext
 from .models import ecp, qwen
-from .pipeline import corpora, judge, report, works
+from .pipeline import corpora, judge, mink_plus_plus, report, works
 from .utils import out, plot_run, read_json
 
 
@@ -42,11 +42,15 @@ def stages(c):
                 "eval": (ecp.evaluate, False, lambda m: out(c, "best.pt.eval_fp32.json")),
                 "plot": (plot_run, False, None)}
     qwen_done = lambda m: out(c, "models", m, "model.safetensors")
+    report_done = lambda m: (out(c, "report", "mink_plus_plus_summary.csv")
+                             if all(os.path.exists(out(c, "mink_plus_plus", f"{x}_metrics.csv")) for x in MODELS)
+                             else out(c, "report", "detection_counts.csv"))
     return {"works": (works.run, False, lambda m: out(c, "works", "works_manifest.jsonl")),
             "corpora": (corpora.run, False, lambda m: out(c, "corpora", "T0_stream.npy")),
             "train": (train, True, qwen_done if c["model"] == "qwen" else None),
             "judge": (judge.run, True, lambda m: out(c, "judge", f"{m}.csv")),
-            "report": (report.run, False, lambda m: out(c, "report", "detection_counts.csv")),
+            "mink_plus_plus": (mink_plus_plus.run, True, lambda m: out(c, "mink_plus_plus", f"{m}_metrics.csv")),
+            "report": (report.run, False, report_done),
             "plot": (plot_run, False, None)}
 
 

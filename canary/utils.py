@@ -39,7 +39,13 @@ def read_jsonl(file):
 @functools.cache
 def tokenizer(name):
     from transformers import AutoTokenizer
-    return AutoTokenizer.from_pretrained(name, cache_dir=DATA_DIR)
+    try:
+        return AutoTokenizer.from_pretrained(name, cache_dir=DATA_DIR)
+    except OSError:
+        snaps = sorted(glob.glob(os.path.join(DATA_DIR, "models--" + name.replace("/", "--"), "snapshots", "*")))
+        if not snaps:
+            raise
+        return AutoTokenizer.from_pretrained(snaps[-1], local_files_only=True)
 
 
 def encode(c, texts):

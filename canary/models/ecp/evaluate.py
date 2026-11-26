@@ -63,11 +63,15 @@ def evaluate(c):
     write_json(out(c, "best.pt.eval_fp32.json"), res)
 
 
-def scorer(c, m):
-    """Judge settings: rows zero-padded to the block length; logits from the unwrapped transformer."""
+def scorer(c, m, checkpoint=None):
+    """Judge/MIA settings: rows zero-padded to the block length; logits from the unwrapped transformer."""
     d = out(c, "models", m, "")
-    ck = torch.load(d + ("best.pt" if os.path.exists(d + "best.pt") else "last.pt"), map_location="cpu",
-                    weights_only=True)
+    if checkpoint:
+        assert os.path.basename(checkpoint) == checkpoint and checkpoint not in (".", ".."), checkpoint
+        name = checkpoint
+    else:
+        name = "best.pt" if os.path.exists(d + "best.pt") else "last.pt"
+    ck = torch.load(os.path.join(d, name), map_location="cpu", weights_only=True)
     model = build(c)
     model.load_state_dict(ck["model"])
     model.to(DEVICE).eval()

@@ -76,10 +76,15 @@ def train(c, m):
     trainer.save_model(d)  # model.safetensors marks the stage as done
 
 
-def scorer(c, m):
-    """Judge settings: pad with EOS to the longest row; lm_head on the scored positions only."""
+def scorer(c, m, checkpoint=None):
+    """Judge/MIA settings: pad with EOS to the longest row; lm_head on the scored positions only."""
     from transformers import Qwen2ForCausalLM
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = Qwen2ForCausalLM.from_pretrained(out(c, "models", m, ""), torch_dtype=torch.float32).to(device).eval()
+    if checkpoint:
+        assert os.path.basename(checkpoint) == checkpoint and checkpoint not in (".", ".."), checkpoint
+        d = out(c, "models", m, checkpoint, "")
+    else:
+        d = out(c, "models", m, "")
+    model = Qwen2ForCausalLM.from_pretrained(d, torch_dtype=torch.float32).to(device).eval()
     return dict(feats=lambda x: model.model(input_ids=x).last_hidden_state, head=model.lm_head,
                 pad=tokenizer(c["tokenizer"]).eos_token_id, width=None, chunk=25, device=model.device)

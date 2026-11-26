@@ -1,10 +1,12 @@
-"""Stage report: judge_raw.csv and detection_counts.csv (detected when rank / K <= alpha)."""
+"""Stage report: judge_raw.csv, detection_counts.csv (detected when rank / K <= alpha), and mink_plus_plus_summary.csv."""
 import csv
+import os
 from collections import Counter
 
 from ..config import MODELS
 from ..utils import out
 from .judge import COLUMNS
+from .mink_plus_plus import METRIC_COLS
 
 
 def run(c):
@@ -28,3 +30,14 @@ def run(c):
         w.writerows([fmt] + [detected[("T0", fmt, r)] for r in reps] for fmt in formats)
         w.writerow([])
         w.writerow([f"null detected / {total['null']}", sum(detected[("null", f, r)] for f in formats for r in reps)])
+
+    mink_files = [out(c, "mink_plus_plus", f"{m}_metrics.csv") for m in MODELS]
+    if all(os.path.exists(p) for p in mink_files):
+        mink_rows = []
+        for p in mink_files:
+            with open(p, newline="") as f:
+                mink_rows += list(csv.reader(f))[1:]
+        summary = out(c, "report", "mink_plus_plus_summary.csv")
+        with open(summary + ".tmp", "w", newline="") as f:
+            csv.writer(f).writerows([METRIC_COLS] + mink_rows)
+        os.replace(summary + ".tmp", summary)

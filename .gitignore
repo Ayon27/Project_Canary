@@ -12,6 +12,3 @@ logs/
 *.slurm
 *.sh
 *_report.md
-
-#temp folder - will fix later
-mink-plus-plus-main

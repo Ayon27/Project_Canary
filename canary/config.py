@@ -31,7 +31,9 @@ MODELS = ("T0", "null")  # trained with and without canaries
 CANARY = dict(K=100, alpha=0.01, block=2048, works_per_group=50, n_heldout=450,
               groups=[(f, r) for f in ("rand_alnum", "rand_words", "carrier") for r in (1, 5, 10)],
               min_sentences=10, length_margin=64, min_leak_tokens=20,
-              selection_seed=1000, group_seed=1001, insertion_seed=1002, train_seed=42)
+              selection_seed=1000, group_seed=1001, insertion_seed=1002, train_seed=42,
+              mink_ratios=(0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+              mink_text="clean_flat", mink_max_tokens=0, mink_checkpoint="")
 
 QWEN = dict(model="qwen", tokenizer="Qwen/Qwen2.5-0.5B", eos="<|endoftext|>", dtype="int32", exact_decode=True,
             arch=dict(hidden_size=896, intermediate_size=4864, num_hidden_layers=24, num_attention_heads=14,
